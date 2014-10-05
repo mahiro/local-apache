@@ -1,0 +1,47 @@
+#!/bin/bash
+cd "$(dirname $0)/.."
+
+make_abs_path() {
+    local path="$1"
+    if [[ $path == /* ]]; then
+        echo "$path"
+    else
+        local prefix="$(apachectl -V | egrep "^ -D HTTPD_ROOT=" | sed 's/.*=//' | sed 's/"//g')"
+        echo "$prefix/$path"
+    fi
+}
+
+get_abs_path() {
+    local varname="$1"
+    local path="$(apachectl -V | egrep "^ -D $varname=" | sed 's/.*=//' | sed 's/"//g')"
+    make_abs_path "$path"
+}
+
+main() {
+    [[ -e docs ]] || mkdir docs
+    [[ -e logs ]] || mkdir logs
+    [[ -e run  ]] || mkdir run
+
+    if [[ ! -e modules ]]; then
+        [[ -L modules ]] && rm modules
+        local default_conf="$(get_abs_path SERVER_CONFIG_FILE)"
+        local sample_module="$(egrep -i '^LoadModule\s+' "$default_conf" | head -1 | awk '{print $3}')"
+        local module_path="$(make_abs_path "$(dirname "$sample_module")")"
+        ln -s "$module_path" modules
+    fi
+
+    if [[ ! -e conf/mime.types ]]; then
+        [[ -L conf/mime.types ]] && rm conf/mime.types
+        local default_types_config="$(get_abs_path AP_TYPES_CONFIG_FILE)"
+        if [[ -e $default_types_config ]]; then
+            ln -s "$default_types_config" conf/mime.types
+        else
+            local default_conf="$(get_abs_path SERVER_CONFIG_FILE)"
+            local sample_types_config="$(egrep -i '^TypesConfig\s+' "$default_conf" | head -1 | awk '{print $2}')"
+            local types_config="$(make_abs_path "$sample_types_config")"
+            ln -s "$types_config" conf/mime.types
+        fi
+    fi
+}
+
+main "$@"
