@@ -8,9 +8,11 @@ This is a utility to run Apache httpd privately, best suited for these cases:
 * The local `httpd.conf` should be minimum as far as the server is functional.
 * You want to add more configurations for experiments.
 
-## How it works
+## Prerequisite
 
-As a prerequisite, Apache 2.x must be installed in the system.
+Apache 2.x must be installed in the system.
+
+## Getting started
 
 Run the commands as below install the directory:
 
@@ -18,7 +20,7 @@ Run the commands as below install the directory:
     $ git clone {the repository}
     $ cd local-apache
 
-Start `httpd`:
+Start the web server:
 
     $ ./bin/apachectl
 
