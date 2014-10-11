@@ -10,15 +10,16 @@ This is a utility to run Apache httpd privately, best suited for these cases:
 
 ## How it works
 
-Confirm `httpd` is available in the `PATH`. It may reside in `/usr/sbin/httpd` which is sometimes not in the `PATH`.
+As a prerequisite, Apache 2.x must be installed in the system.
 
-    $ which httpd
-
-Run the commands as below:
+Run the commands as below install the directory:
 
     $ cd {your directory}
     $ git clone {the repository}
     $ cd local-apache
+
+Start `httpd`:
+
     $ ./bin/apachectl
 
 Create an `index.html` file:
