@@ -2,14 +2,18 @@
 
 if [[ -n "$HTTPD" ]]; then
     "$HTTPD" "$@"
-elif [[ -n "$(which httpd 2> /dev/null)" ]]; then
-    httpd "$@"
 elif [[ -n "$(which apache2 2> /dev/null)" ]]; then
     apache2 "$@"
-elif [[ -x /usr/sbin/httpd ]]; then
-    /usr/sbin/httpd "$@"
+elif [[ -n "$(which httpd2 2> /dev/null)" ]]; then
+    httpd2 "$@"
+elif [[ -n "$(which httpd 2> /dev/null)" ]]; then
+    httpd "$@"
 elif [[ -x /usr/sbin/apache2 ]]; then
     /usr/sbin/apache2 "$@"
+elif [[ -x /usr/sbin/httpd2 ]]; then
+    /usr/sbin/httpd2 "$@"
+elif [[ -x /usr/sbin/httpd ]]; then
+    /usr/sbin/httpd "$@"
 else
     echo "Apache installation could not be found. Set HTTPD or PATH and try again." 1>&2
     exit 1
