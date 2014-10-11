@@ -3,4 +3,4 @@ cd "$(dirname $0)/.."
 ./bin/prepare
 export SERVER_NAME="${SERVER_NAME:-localhost}"
 export SERVER_PORT="${SERVER_PORT:-8080}"
-apachectl -d "$PWD" -f conf/httpd.conf "$@"
+httpd -d "$PWD" -f conf/httpd.conf "$@"
