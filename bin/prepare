@@ -144,17 +144,18 @@ sub main {
     # Local conf
     do {
         my $path = 'conf/include/local.conf';
+        my $custom_lock_file = 'run/accept.lock';
 
         if (!-e $path) {
             append_file($path, '');
 
             if ($settings->{DEFAULT_LOCKFILE}) {
-                append_file($path, "LockFile logs/accept.lock\n");
+                append_file($path, "LockFile $custom_lock_file\n");
             } else {
                 $conf ||= read_config($httpd_root, $config_file);
 
                 if ($conf->{LockFile}) {
-                    append_file($path, "LockFile logs/accept.lock\n");
+                    append_file($path, "LockFile $custom_lock_file\n");
                 }
             }
         }
