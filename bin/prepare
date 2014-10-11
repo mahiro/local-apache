@@ -1,47 +1,201 @@
-#!/bin/bash
-cd "$(dirname $0)/.."
+#!/usr/bin/env perl
+use strict;
+use warnings;
 
-make_abs_path() {
-    local path="$1"
-    if [[ $path == /* ]]; then
-        echo "$path"
-    else
-        local prefix="$(apachectl -V | egrep "^ -D HTTPD_ROOT=" | sed 's/.*=//' | sed 's/"//g')"
-        echo "$prefix/$path"
-    fi
+use File::Basename qw(dirname);
+use File::Path qw(mkpath);
+use File::Spec;
+use FindBin;
+
+BEGIN {
+    chdir "$FindBin::Bin/..";
 }
 
-get_abs_path() {
-    local varname="$1"
-    local path="$(apachectl -V | egrep "^ -D $varname=" | sed 's/.*=//' | sed 's/"//g')"
-    make_abs_path "$path"
+sub build_path {
+    my $result = shift;
+
+    for my $path (@_) {
+        if (File::Spec->file_name_is_absolute($path)) {
+            $result = $path;
+        } else {
+            $result = File::Spec->catfile($result, $path);
+        }
+    }
+
+    return $result;
 }
 
-main() {
-    [[ -e docs ]] || mkdir docs
-    [[ -e logs ]] || mkdir logs
-    [[ -e run  ]] || mkdir run
-
-    if [[ ! -e modules ]]; then
-        [[ -L modules ]] && rm modules
-        local default_conf="$(get_abs_path SERVER_CONFIG_FILE)"
-        local sample_module="$(egrep -i '^LoadModule\s+' "$default_conf" | head -1 | awk '{print $3}')"
-        local module_path="$(make_abs_path "$(dirname "$sample_module")")"
-        ln -s "$module_path" modules
-    fi
-
-    if [[ ! -e conf/mime.types ]]; then
-        [[ -L conf/mime.types ]] && rm conf/mime.types
-        local default_types_config="$(get_abs_path AP_TYPES_CONFIG_FILE)"
-        if [[ -e $default_types_config ]]; then
-            ln -s "$default_types_config" conf/mime.types
-        else
-            local default_conf="$(get_abs_path SERVER_CONFIG_FILE)"
-            local sample_types_config="$(egrep -i '^TypesConfig\s+' "$default_conf" | head -1 | awk '{print $2}')"
-            local types_config="$(make_abs_path "$sample_types_config")"
-            ln -s "$types_config" conf/mime.types
-        fi
-    fi
+sub remove_quotes {
+    my ($value) = @_;
+    $value =~ s/\\"/"/g if $value =~ s/^"|"$//g;
+    return $value;
 }
 
-main "$@"
+sub load_settings {
+    my $settings = {};
+    my $output = `httpd -V`;
+
+    while ($output =~ /^\s*-D\s*(.*?)=(.*)$/mg) {
+        my ($name, $value) = ($1, $2);
+        $settings->{$name} = remove_quotes($value);
+    }
+
+    return $settings;
+}
+
+sub _read_config_recursive {
+    my ($httpd_root, $file_path, $conf, $seen) = @_;
+    $conf ||= {};
+    $seen ||= {};
+
+    if ($seen->{$file_path}) {
+        return $conf;
+    } else {
+        $seen->{$file_path} = 1;
+    }
+
+    for my $file (glob(build_path($httpd_root, $file_path))) {
+        if (open(my $in, $file)) {
+            while (my $line = <$in>) {
+                if ($line =~ /^\s*Include(?:Optional)?\s+(.*?)\s*$/i) {
+                    my $path = remove_quotes($1);
+                    _read_config_recursive($httpd_root, $path, $conf, $seen);
+                } elsif ($line =~ /^\s*LoadModule\s+(\S+)\s+(.*?)\s*$/i) {
+                    my ($name, $path) = ($1, remove_quotes($2));
+                    push @{$conf->{LoadedModules}}, $path;
+                } else {
+                    for my $directive (qw(PidFile LockFile TypesConfig MimeMagicFile)) {
+                        if ($line =~ /^\s*$directive\s+(.*?)\s*$/i) {
+                            my $value = remove_quotes($1);
+                            $conf->{$directive} = $value;
+                        }
+                    }
+                }
+            }
+
+            close $in;
+        }
+    }
+
+    return $conf;
+}
+
+sub read_config {
+    my ($httpd_root, $config_file) = @_;
+    return _read_config_recursive($httpd_root, $config_file);
+}
+
+sub append_file {
+    my ($file, $text) = @_;
+
+    if (open(my $out, '>>', $file)) {
+        print $out $text;
+        close $out;
+    } else {
+        warn "Failed to open file for writing: $file\n";
+    }
+}
+
+sub get_modules_dir {
+    my ($conf) = @_;
+    my $stat = {};
+
+    for my $path (@{$conf->{LoadedModules}}) {
+        my $dir = dirname($path);
+        $stat->{$dir}++;
+    }
+
+    my $max_cnt = 0;
+    my $max_dir;
+
+    for my $dir (keys %$stat) {
+        if ($max_cnt < $stat->{$dir}) {
+            $max_cnt = $stat->{$dir};
+            $max_dir = $dir;
+        }
+    }
+
+    return $max_dir;
+}
+
+sub _symlink {
+    my ($httpd_root, $target, $path) = @_;
+    $target = build_path($httpd_root, $target) if $target;
+
+    if ($target && -e $target) {
+        symlink $target, $path;
+    } else {
+        warn "Target for '$path' could not be found. Create symlink manually\n";
+        warn "\$ ln -s /path/to/$path $path\n";
+    }
+}
+
+sub main {
+    my $settings = load_settings();
+    my $httpd_root = $settings->{HTTPD_ROOT};
+    my $config_file = $settings->{SERVER_CONFIG_FILE};
+
+    my $conf;
+
+    mkpath 'docs';
+    mkpath 'logs';
+    mkpath 'run';
+
+    # Local conf
+    do {
+        my $path = 'conf/include/local.conf';
+
+        if (!-e $path) {
+            append_file($path, '');
+
+            if ($settings->{DEFAULT_LOCKFILE}) {
+                append_file($path, "LockFile logs/accept.lock\n");
+            } else {
+                $conf ||= read_config($httpd_root, $config_file);
+
+                if ($conf->{LockFile}) {
+                    append_file($path, "LockFile logs/accept.lock\n");
+                }
+            }
+        }
+    };
+
+    # MIME types
+    do {
+        my $path = 'conf/mime.types';
+
+        if (!-e $path) {
+            unlink $path if -l $path;
+            $conf ||= read_config($httpd_root, $config_file);
+            my $target = $conf->{TypesConfig} || $settings->{AP_TYPES_CONFIG_FILE} ||
+                build_path(dirname($config_file), 'mime.types');
+            _symlink $httpd_root, $target, $path;
+        }
+    };
+
+    # Magic
+    do {
+        my $path = 'conf/magic';
+
+        if (!-e $path) {
+            unlink $path if -l $path;
+            $conf ||= read_config($httpd_root, $config_file);
+            my $target = $conf->{MimeMagicFile} || build_path(dirname($config_file), 'magic');
+            _symlink $httpd_root, $target, $path;
+        }
+    };
+
+    # Modules
+    do {
+        my $path = 'modules';
+
+        if (!-e $path) {
+            unlink $path if -l $path;
+            $conf ||= read_config($httpd_root, $config_file);
+            my $target = get_modules_dir($conf);
+            _symlink($httpd_root, $target, $path);
+        }
+    };
+}
+
+main();
