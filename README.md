@@ -10,9 +10,9 @@ This is a utility to run Apache httpd privately, best suited for these cases:
 
 ## How it works
 
-Confirm `apachectl` is available in the `PATH`. Otherwise, install Apache httpd first!
+Confirm `httpd` is available in the `PATH`. It may reside in `/usr/sbin/httpd` which is sometimes not in the `PATH`.
 
-    $ which apachectl
+    $ which httpd
 
 Run the commands as below:
 
@@ -21,7 +21,12 @@ Run the commands as below:
     $ cd local-apache
     $ ./bin/apachectl
 
+Create an `index.html` file:
+
+    $ echo Hello World > docs/index.html
+
 Then you can open [http://localhost:8080/](http://localhost:8080/) with the browser.
+If it doesn't work, see the error log (`logs/error.log`) and consult the Troubleshooting section below.
 
 `./bin/apachectl` is a wrapper that works just like `apachectl`.
 
@@ -46,6 +51,7 @@ Contains minimum `httpd.conf` with `Include conf/include/*.conf` directive.
 You can add your additional configurations to the `include` sub-directory.
 
 Any files with the `bundled-` prefix indicate pre-bundled in this distribution (git repository).
+In addition, `conf/include/local.conf` is automatically generated (only when it does not exist) to include environment-specific configuration.
 
 ### ./docs
 
@@ -72,6 +78,26 @@ Unless the directory exists at startup time, a symlink is automatically created.
 
 * httpd.pid
 * accept.lock.*
+
+## Troubleshooting
+
+### AH00534: httpd: Configuration error: No MPM loaded.
+
+Add an MPM module. E.g.
+
+    LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
+
+### AH00136: Server MUST relinquish startup privileges before accepting connections.  Please ensure mod_unixd or other system security module is loaded.
+
+Add `mod_unixd`:
+
+    LoadModule unixd_module modules/mod_unixd.so
+
+### AH00025: configuration error:  couldn't check user: /
+
+Add `mod_authz_core`:
+
+    LoadModule authz_core_module modules/mod_authz_core.so
 
 ## License
 
