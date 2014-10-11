@@ -33,7 +33,7 @@ sub remove_quotes {
 
 sub load_settings {
     my $settings = {};
-    my $output = `httpd -V`;
+    my $output = `$FindBin::Bin/httpd -V`;
 
     while ($output =~ /^\s*-D\s*(.*?)=(.*)$/mg) {
         my ($name, $value) = ($1, $2);

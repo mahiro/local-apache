@@ -1,6 +1,8 @@
 #!/bin/bash
+set -e
 cd "$(dirname $0)/.."
+./bin/httpd -V > /dev/null
 ./bin/prepare
 export SERVER_NAME="${SERVER_NAME:-localhost}"
 export SERVER_PORT="${SERVER_PORT:-8080}"
-httpd -d "$PWD" -f conf/httpd.conf "$@"
+./bin/httpd -d "$PWD" -f conf/httpd.conf "$@"
