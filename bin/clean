@@ -2,4 +2,4 @@
 cd "$(dirname $0)"
 cd ..
 [[ -f run/httpd.pid ]] && ./bin/apachectl -k stop
-rm -rf docs logs run modules conf/mime.types
+rm -rf docs logs run modules conf/mime.types conf/magic
