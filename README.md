@@ -16,17 +16,21 @@ Apache 2.x must be installed in the system.
 
 Run the commands as below install the directory:
 
-    $ cd {your directory}
-    $ git clone {the repository}
+    $ cd {development directory}
+    $ git clone http://{the repository}
     $ cd local-apache
 
-Start the web server:
+Deloy a web server:
 
+    $ ./bin/local-apache {new apache directory}
+
+Note: It is possible to install the local apache into the current directory (Git working directory), if it is for an experimental purpose.
+It is not recommended if you plan to add your specific customization to the `conf` or `docs` directory.
+
+Start the web server in the deployed directory:
+
+    $ cd {new apache directory]
     $ ./bin/apachectl
-
-Create an `index.html` file:
-
-    $ echo Hello World > docs/index.html
 
 Then you can open [http://localhost:8080/](http://localhost:8080/) with the browser.
 If it doesn't work, see the error log (`logs/error.log`) and consult the Troubleshooting section below.
@@ -37,9 +41,9 @@ If it doesn't work, see the error log (`logs/error.log`) and consult the Trouble
     $ ./bin/apachectl -k restart
     $ ./bin/apachectl -k graceful
 
-If you want to use a different port number, set the `SERVER_PORT` environment variable.
+If you want to use a different port number, set the `SERVER_PORT` variable in `conf/local-apache.env`.
 
-    $ SERVER_PORT=5555 ./bin/apachectl
+    $ {edit} conf/local-apache.env
 
 ## Directory layout
 
@@ -53,8 +57,7 @@ Contains minimum `httpd.conf` with `Include conf/include/*.conf` directive.
 
 You can add your additional configurations to the `include` sub-directory.
 
-Any files with the `bundled-` prefix indicate pre-bundled in this distribution (git repository).
-In addition, `conf/include/local.conf` is automatically generated (only when it does not exist) to include environment-specific configuration.
+Common environment variables (including the port number) can be configured in the `local-apache.env` file.
 
 ### ./docs
 
@@ -64,7 +67,7 @@ Any URL paths that contain `/cgi-bin/` or end with `.cgi` will invoke the script
 
 Optionally, create a symlink to use your existing document root:
 
-    $ rmdir docs
+    $ rm -rf docs
     $ ln -s /existing/document/root docs
 
 ### ./logs

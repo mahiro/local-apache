@@ -2,14 +2,11 @@
 use strict;
 use warnings;
 
-use File::Basename qw(dirname);
+use File::Basename qw(basename dirname);
+use File::Copy qw(copy);
 use File::Path qw(mkpath);
 use File::Spec;
 use FindBin;
-
-BEGIN {
-    chdir "$FindBin::Bin/..";
-}
 
 sub build_path {
     my $result = shift;
@@ -118,7 +115,7 @@ sub get_modules_dir {
     return $max_dir;
 }
 
-sub _symlink {
+sub httpd_symlink {
     my ($httpd_root, $target, $path) = @_;
     $target = build_path($httpd_root, $target) if $target;
 
@@ -130,28 +127,83 @@ sub _symlink {
     }
 }
 
+sub process_skeleton {
+    my ($skeleton, $ref_dir, $path) = @_;
+
+    for my $key (keys %$skeleton) {
+        my $handler = $skeleton->{$key};
+
+        for my $ref_path (glob($path ne '' ? "$ref_dir/$path/$key" : "$ref_dir/$key")) {
+            my $sub_path = substr($ref_path, length($ref_dir) + 1);
+
+            if (ref $handler eq 'HASH') {
+                if (!-e $sub_path && !-l $sub_path) {
+                    mkpath($sub_path);
+                    process_skeleton($handler, $ref_dir, $sub_path);
+                }
+            } elsif (ref $handler eq 'CODE') {
+                if (!-e $sub_path) {
+                    unlink $sub_path if -l $sub_path;
+
+                    do {
+                        local $_ = $sub_path;
+                        $handler->();
+                    };
+                }
+            }
+        }
+    }
+}
+
 sub main {
+    if (@ARGV < 1) {
+        my $cmd = basename($FindBin::Script);
+        die "Usage: $cmd BASE_DIR\n";
+    }
+
+    my ($deploy_dir) = @ARGV;
+    mkpath $deploy_dir if !-e $deploy_dir;
+    chdir $deploy_dir;
+
+    my $bin_dir = $FindBin::Bin;
+    my $ref_dir = dirname($bin_dir);
+
+    # Traverse skeleton
+    my $symlink_ref = sub {
+        symlink("$ref_dir/$_", $_);
+    };
+
+    my $copy_ref = sub {
+        copy("$ref_dir/$_", $_);
+    };
+
+    my $skeleton = {
+        'bin' => {
+            'apachectl' => $symlink_ref,
+            'httpd' => $symlink_ref,
+        },
+        'conf' => {
+            'httpd.conf'=> $copy_ref,
+            'local-apache.env' => $copy_ref,
+            'include' => {
+                '*.conf' => $copy_ref,
+            },
+        },
+        'docs' => {
+            'index.html' => $copy_ref,
+        },
+        'logs' => {},
+        'run' => {},
+    };
+
+    process_skeleton($skeleton, $ref_dir, '');
+
+    # Configure settings
     my $settings = load_settings();
     my $httpd_root = $settings->{HTTPD_ROOT};
     my $config_file = $settings->{SERVER_CONFIG_FILE};
 
     my $conf;
-
-    mkpath 'docs';
-    mkpath 'logs';
-    mkpath 'run';
-
-    # local-apache.env
-    do {
-        my $path = 'conf/local-apache.env';
-
-        if (!-e $path) {
-            if (open(my $out, '>', $path)) {
-                print $out "SERVER_PORT=8080\n";
-                close $out;
-            }
-        }
-    };
 
     # MIME types
     do {
@@ -162,7 +214,7 @@ sub main {
             $conf ||= read_config($httpd_root, $config_file);
             my $target = $conf->{TypesConfig} || $settings->{AP_TYPES_CONFIG_FILE} ||
                 build_path(dirname($config_file), 'mime.types');
-            _symlink $httpd_root, $target, $path;
+            httpd_symlink $httpd_root, $target, $path;
         }
     };
 
@@ -174,7 +226,7 @@ sub main {
             unlink $path if -l $path;
             $conf ||= read_config($httpd_root, $config_file);
             my $target = $conf->{MimeMagicFile} || build_path(dirname($config_file), 'magic');
-            _symlink $httpd_root, $target, $path;
+            httpd_symlink $httpd_root, $target, $path;
         }
     };
 
@@ -186,7 +238,7 @@ sub main {
             unlink $path if -l $path;
             $conf ||= read_config($httpd_root, $config_file);
             my $target = get_modules_dir($conf);
-            _symlink($httpd_root, $target, $path);
+            httpd_symlink($httpd_root, $target, $path);
         }
     };
 }

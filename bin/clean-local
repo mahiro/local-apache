@@ -1,0 +1,4 @@
+#!/bin/bash
+cd "$(dirname $0)/.."
+./bin/apachectl -k stop 2> /dev/null
+rm -rf logs run modules conf/mime.types conf/magic
