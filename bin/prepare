@@ -141,6 +141,18 @@ sub main {
     mkpath 'logs';
     mkpath 'run';
 
+    # local-apache.env
+    do {
+        my $path = 'conf/local-apache.env';
+
+        if (!-e $path) {
+            if (open(my $out, '>', $path)) {
+                print $out "SERVER_PORT=8080\n";
+                close $out;
+            }
+        }
+    };
+
     # MIME types
     do {
         my $path = 'conf/mime.types';

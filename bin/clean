@@ -1,5 +1,4 @@
 #!/bin/bash
-cd "$(dirname $0)"
-cd ..
+cd "$(dirname $0)/.."
 [[ -f run/httpd.pid ]] && ./bin/apachectl -k stop
-rm -rf docs logs run modules conf/mime.types conf/magic
+rm -rf docs logs run modules conf/local-apache.env conf/mime.types conf/magic
