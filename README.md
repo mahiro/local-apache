@@ -87,13 +87,17 @@ Unless the directory exists at startup time, a symlink is automatically created.
 
 ## Troubleshooting
 
+If the web server does not start up, check the output of `./bin/apachectl` or the content of `./logs/error.log` to see if there are any error messages.
+
+In order to adjust the configuration, it is recommended to create a file named `./conf/include/local.conf` and add your own lines.
+
 ### AH00534: httpd: Configuration error: No MPM loaded.
 
 Add an MPM module. E.g.
 
     LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
 
-### AH00136: Server MUST relinquish startup privileges before accepting connections.  Please ensure mod_unixd or other system security module is loaded.
+### AH00136: Server MUST relinquish startup privileges before accepting connections.  Please ensure mod\_unixd or other system security module is loaded.
 
 Add `mod_unixd`:
 
@@ -104,6 +108,14 @@ Add `mod_unixd`:
 Add `mod_authz_core`:
 
     LoadModule authz_core_module modules/mod_authz_core.so
+
+### No such file or directory: AH00023: Couldn't create the mpm-accept mutex
+
+Set `Mutex` file path:
+
+    Mutex file:run mutex-accept
+
+Note: If you have deployed `local-apache` under an NFS or AFS directory, you need to specify a local disk file system as `file:/path/to/dir`.
 
 ## License
 
